@@ -1,11 +1,8 @@
 import streamlit as st
+from ultralytics import YOLO
 from PIL import Image
 import numpy as np
-import cv2
 import logging
-import torch
-from torch.serialization import safe_load, safe_globals
-from ultralytics.nn.tasks import DetectionModel
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)
@@ -26,11 +23,9 @@ MODEL_PATH = "best.pt"
 @st.cache_resource
 def load_model():
     try:
-        with safe_globals([DetectionModel]):
-            model = torch.load(MODEL_PATH, weights_only=False, map_location='cpu')
-            model = model.autoshape()
-            logger.info("✅ Model loaded successfully.")
-            return model
+        model = YOLO(MODEL_PATH)
+        logger.info("✅ Model loaded successfully.")
+        return model
     except Exception as e:
         logger.error(f"❌ Failed to load model. Error: {e}")
         return None
@@ -50,17 +45,18 @@ if uploaded_file and model:
         image_np = np.array(image)
 
         # Run detection
-        results = model(image_np, conf=confidence_threshold)[0]
+        results = model.predict(image_np, conf=confidence_threshold)
+        result = results[0]
 
         # Draw annotated results
-        annotated = results.plot()
+        annotated = result.plot()
 
         # Display result
         st.image(annotated, caption="🔍 Detection Result", use_column_width=True)
 
         # Show detection info
         st.subheader("📋 Detections")
-        boxes = results.boxes
+        boxes = result.boxes
         if boxes is not None and len(boxes) > 0:
             for i, box in enumerate(boxes):
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
