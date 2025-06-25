@@ -5,19 +5,28 @@ import numpy as np
 import cv2
 import io
 import os
+from torch.serialization import safe_globals
+from ultralytics.nn.tasks import DetectionModel
+import logging
+
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # -----------------------
-# Load YOLO model
+# Load YOLO model safely (PyTorch 2.6+ fix)
 # -----------------------
 MODEL_PATH = "best.pt"
 
 @st.cache_resource
 def load_model():
     try:
-        model = YOLO(MODEL_PATH)
+        with safe_globals([DetectionModel]):
+            model = YOLO(MODEL_PATH)
+        logger.info("✅ Model loaded successfully from best.pt")
         return model
     except Exception as e:
-        st.error(f"Failed to load model from {MODEL_PATH}. Error: {e}")
+        logger.error(f"❌ Failed to load model from {MODEL_PATH}. Error: {e}")
         return None
 
 model = load_model()
@@ -37,21 +46,21 @@ uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
 if uploaded_file and model:
     try:
-        # Read image
+        # Read and convert image
         image = Image.open(uploaded_file).convert("RGB")
         image_np = np.array(image)
 
         # Inference
         results = model.predict(image_np, conf=confidence_threshold)
-        result = results[0]  # First result
+        result = results[0]  # Only one image
 
         # Draw detections
         annotated = result.plot()
 
-        # Display
+        # Display image
         st.image(annotated, caption="🔍 Detection Result", use_column_width=True)
 
-        # Show detection info
+        # Display detection info
         st.subheader("📋 Detections")
         boxes = result.boxes
         if boxes is not None and len(boxes) > 0:
@@ -65,6 +74,7 @@ if uploaded_file and model:
         else:
             st.info("No objects detected.")
     except Exception as e:
-        st.error(f"Error during detection: {e}")
+        st.error(f"❌ Error during detection: {e}")
+
 elif not model:
-    st.error("Model not loaded. Please check the model path.")
+    st.error("❌ Model not loaded. Please check the model path or loading logic.")
