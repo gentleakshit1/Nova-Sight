@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 import logging
 
+
 # Configure logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
